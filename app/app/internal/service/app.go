@@ -68,21 +68,30 @@ func (a *AppService) Deposit(ctx context.Context, req *v1.DepositRequest) (*v1.D
 
 	var (
 		configs []*biz.Config
-		bPrice  float64
+		//bPrice   float64
+		closeBuy uint64
 	)
 	configs, _ = a.uuc.GetbPriceConfig(ctx)
 	if nil != configs {
 		for _, vConfig := range configs {
-			if "b_price" == vConfig.KeyName {
-				bPrice, _ = strconv.ParseFloat(vConfig.Value, 10)
+			if "close_buy" == vConfig.KeyName {
+				closeBuy, _ = strconv.ParseUint(vConfig.Value, 10, 64)
 			}
+
+			//if "b_price" == vConfig.KeyName {
+			//	bPrice, _ = strconv.ParseFloat(vConfig.Value, 10)
+			//}
 		}
 	}
 
-	if 0 == bPrice {
-		fmt.Println("入金错误：价格为0")
+	if 1 == closeBuy {
 		return nil, nil
 	}
+
+	//if 0 == bPrice {
+	//	fmt.Println("入金错误：价格为0")
+	//	return nil, nil
+	//}
 
 	for i := 1; i <= 10; i++ {
 		var (
@@ -157,10 +166,14 @@ func (a *AppService) Deposit(ctx context.Context, req *v1.DepositRequest) (*v1.D
 					tmpValue int64
 				)
 
-				if 100 <= vUser.Amount {
+				if 500 == vUser.Amount {
+					tmpValue = vUser.Amount
+				} else if 1000 == vUser.Amount {
+					tmpValue = vUser.Amount
+				} else if 2000 == vUser.Amount {
 					tmpValue = vUser.Amount
 				} else {
-					return &v1.DepositReply{}, nil
+					continue
 				}
 
 				// 充值

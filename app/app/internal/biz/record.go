@@ -201,27 +201,86 @@ func (ruc *RecordUseCase) DepositNew(ctx context.Context, userId int64, amount u
 		err error
 	)
 
-	// 推荐人
-	//var (
-	//	userRecommend         *UserRecommend
-	//	myUserRecommendUserId int64
-	//	tmpRecommendUserIds   []string
-	//)
-	//userRecommend, err = ruc.userRecommendRepo.GetUserRecommendByUserId(ctx, userId)
-	//if nil != err {
-	//	return err
-	//}
-	//if "" != userRecommend.RecommendCode {
-	//	tmpRecommendUserIds = strings.Split(userRecommend.RecommendCode, "D")
-	//	if 2 <= len(tmpRecommendUserIds) {
-	//		myUserRecommendUserId, _ = strconv.ParseInt(tmpRecommendUserIds[len(tmpRecommendUserIds)-1], 10, 64) // 最后一位是直推人
-	//	}
-	//}
+	var (
+		configs        []*Config
+		recommendOne   float64
+		recommendTwo   float64
+		recommendThree float64
+	)
 
-	if err = ruc.tx.ExecTx(ctx, func(ctx context.Context) error { // 事务
-		err = ruc.userInfoRepo.UpdateUserNewTwoNewTwo(ctx, userId, amount)
+	// 配置
+	configs, _ = ruc.configRepo.GetConfigByKeys(ctx, "recommend_one", "recommend_two", "recommend_three")
+	if nil != configs {
+		for _, vConfig := range configs {
+			if "recommend_one" == vConfig.KeyName {
+				recommendOne, _ = strconv.ParseFloat(vConfig.Value, 10)
+			}
+			if "recommend_two" == vConfig.KeyName {
+				recommendTwo, _ = strconv.ParseFloat(vConfig.Value, 10)
+			}
+			if "recommend_three" == vConfig.KeyName {
+				recommendThree, _ = strconv.ParseFloat(vConfig.Value, 10)
+			}
+		}
+	}
+
+	// 推荐人
+	var (
+		userRecommend         *UserRecommend
+		user                  *User
+		user2                 *User
+		myUserRecommendUserId int64
+		level                 int64
+		amountRecommendTmp    float64
+		tmpRecommendUserIds   []string
+	)
+	userRecommend, err = ruc.userRecommendRepo.GetUserRecommendByUserId(ctx, userId)
+	if nil != err {
+		return err
+	}
+	if "" != userRecommend.RecommendCode {
+		tmpRecommendUserIds = strings.Split(userRecommend.RecommendCode, "D")
+		if 2 <= len(tmpRecommendUserIds) {
+			myUserRecommendUserId, _ = strconv.ParseInt(tmpRecommendUserIds[len(tmpRecommendUserIds)-1], 10, 64) // 最后一位是直推人
+		}
+	}
+
+	user, err = ruc.userInfoRepo.GetUserByUserId(ctx, userId)
+	if nil != err {
+		return err
+	}
+
+	if 0 < myUserRecommendUserId {
+		user2, err = ruc.userInfoRepo.GetUserByUserId(ctx, myUserRecommendUserId)
 		if nil != err {
 			return err
+		}
+
+		if 2000 <= user2.Amount {
+			level = 4
+			amountRecommendTmp = float64(amount) * recommendThree
+		} else if 1000 <= user2.Amount {
+			level = 3
+			amountRecommendTmp = float64(amount) * recommendTwo
+		} else if 500 <= user2.Amount {
+			level = 2
+			amountRecommendTmp = float64(amount) * recommendOne
+		}
+	}
+
+	if err = ruc.tx.ExecTx(ctx, func(ctx context.Context) error { // 事务
+		err = ruc.userInfoRepo.UpdateUserNewTwoNew(ctx, userId, amount, float64(amount))
+		if nil != err {
+			return err
+		}
+
+		// 直推
+		if nil != user2 && 1 < level && 0 < amountRecommendTmp {
+			_, err = ruc.userInfoRepo.UpdateUserRewardRecommend2(ctx, user2.ID, amountRecommendTmp, level, 1, user.Address)
+			if err != nil {
+				fmt.Println("错误直推分红usdt：", err)
+				return err
+			}
 		}
 
 		//err = ruc.userInfoRepo.UpdateUserNewTwoNew(ctx, userId, amount, originTotal, strUpdate, int64(last), uudt, kkdt)
