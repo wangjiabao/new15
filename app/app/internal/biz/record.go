@@ -258,13 +258,13 @@ func (ruc *RecordUseCase) DepositNew(ctx context.Context, userId int64, amount u
 
 		if 2000 <= user2.Amount {
 			level = 4
-			amountRecommendTmp = float64(amount) * recommendThree
+			amountRecommendTmp = float64(user2.Amount) * recommendThree
 		} else if 1000 <= user2.Amount {
 			level = 3
-			amountRecommendTmp = float64(amount) * recommendTwo
+			amountRecommendTmp = float64(user2.Amount) * recommendTwo
 		} else if 500 <= user2.Amount {
 			level = 2
-			amountRecommendTmp = float64(amount) * recommendOne
+			amountRecommendTmp = float64(user2.Amount) * recommendOne
 		}
 	}
 
